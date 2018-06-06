@@ -19,11 +19,11 @@ export class FacternService {
     private readonly FactsApi = new FacternClient.FactsApi();
     private readonly OAuth2 = this.ApiClient.authentications['OAuth2'];
 
-    private readonly NAMED_ENTITY_SERVICE = 'erchl-service-201805111200';
-    private readonly NAMED_ENTITY_PREFIX_COMPANY = 'erchl-company-201805141104-';
-    private readonly NAMED_FIELDTYPE_COMMENT = 'erchl-company-comment-field-201805151539';
-    private readonly NAMED_TEMPLATE_COMMENT = 'erchl-company-comment-template-201805151539';
-    private readonly NAMED_INTERFACE_COMPANIES = 'erchl-interface-companies-201805111200';
+    private readonly NAMED_ENTITY_SERVICE = 'erchl-service-201806051014';
+    private readonly NAMED_ENTITY_PREFIX_COMPANY = 'erchl-company-201806051014-';
+    private readonly NAMED_FIELDTYPE_COMMENT = 'erchl-company-comment-field-201806051014';
+    private readonly NAMED_TEMPLATE_COMMENT = 'erchl-company-comment-template-201806051014';
+    private readonly NAMED_INTERFACE_COMPANIES = 'erchl-interface-companies-201806051014';
 
     public constructor(loginId: string, accessToken: string, companyHouseKey: string) {
       this.OAuth2.accessToken = accessToken;
@@ -130,7 +130,7 @@ export class FacternService {
                         async: false,
                     },
                     getData: {
-                        url: 'https://api.companieshouse.gov.uk/search/companies?q={query}&items_per_page={items}&start_index={start}',
+                        url: 'https://api.companieshouse.gov.uk/search/companies?q={{query}}&items_per_page={{items}}&start_index={{start}}',
                         method: 'GET',
                         headers: [{
                             key: 'Authorization',
