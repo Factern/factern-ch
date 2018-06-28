@@ -1,0 +1,80 @@
+<!--
+/*
+ * details.component.html
+ *
+ * Copyright (C) 2018 Finovertech
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
+-->
+
+<main role="main" style="margin-top: 80px;">
+
+  <div *ngIf="companyProfileAsync | async as companyProfile" class="container">
+
+    <div class="row">
+      <div class="col-sm-12 col-md-8 col-lg-8">
+        <form [formGroup]="commentFormGroup">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">{{ companyProfile.company_name }}</h5>
+              <h6 class="card-subtitle mb-2 text-muted">Company Number: {{ companyProfile.company_number }}</h6>
+              <p class="card-text">
+                Number of comments: {{ companyProfile.commentThread.count }}<br/>
+              </p>
+              <div class="row mb-3">
+                <div class="col-sm-8">
+                  <p class="card-text">
+                    <input #comment type="text" class="form-control form-control-sm" placeholder="Enter a Comment" comment="" aria-label="Enter a Comment">
+                  </p>
+                </div>
+                <div *ngIf="isAuthenticated" class="col-sm-4">
+                  <label class="checkbox-inline"><input class="mr-3" type="checkbox" [checked]="privacy" (change)="privacy = !privacy">Private Comment</label>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-block" (click)="addComment(companyProfile.company_number, comment.value, privacy)">Add Comment</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div *ngIf="companyProfile.commentThread.count > 0" class="container">
+      <div *ngFor="let comment of companyProfile.commentThread.comments; let i = index; let odd = odd" class="row mt-3">
+        <div class="col-sm-12 col-md-8 col-lg-8">
+          <div class="card" [class.odd]="odd">
+            <div class="card-body">
+              <p class="card-text">
+                  <i *ngIf="isAuthenticated && comment.owner === loggedInId" class="fa fa-lock" aria-hidden="true"></i> {{ comment.text }}
+              </p>
+              <div class="row mb-3">
+                <div class="col-sm-8">
+                  <p class="card-text">
+                    <input #response type="text" class="form-control form-control-sm" placeholder="Enter a Response" comment="" aria-label="Enter a Response">
+                  </p>
+                </div>
+                <div *ngIf="isAuthenticated" class="col-sm-4">
+                  <label class="checkbox-inline"><input class="mr-3" type="checkbox" [checked]="rprivacy" (change)="rprivacy = !rprivacy">Private</label>
+                </div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-block" (click)="addResponse(companyProfile.commentThread.comments[i].id, response.value, rprivacy)">Add Response</button>
+              <div *ngIf="comment.responseThread.count > 0">
+                <div *ngFor="let response1 of comment.responseThread.comments" class="row mt-3">
+                  <hr />
+                  <div class="card-body">
+                    <p class="card-text">
+                      {{ response1.text }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</main>

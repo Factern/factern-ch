@@ -1,5 +1,5 @@
 /*
- * index.ts
+ * company-list.type.ts
  *
  * Copyright (C) 2018 Finovertech
  *
@@ -7,4 +7,8 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-export { CompanyTypedef } from './company.typedef';
+import { Company } from './company.type';
+
+export interface CompanyList {
+  items: Company[];
+}

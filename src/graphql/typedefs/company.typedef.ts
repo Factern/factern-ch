@@ -1,3 +1,11 @@
+/*
+ * company.typedef.ts
+ *
+ * Copyright (C) 2018 Finovertech
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
 
 import {
   GraphQLObjectType,
@@ -65,6 +73,39 @@ export class CompanyTypedef {
     })
   });
 
+  private readonly companyProfileType = new GraphQLObjectType({
+    name: 'CompanyProfile',
+    description: '',
+
+    fields: () => ({
+      company_name: {
+        type: GraphQLString,
+        description: 'The name of the company.'
+      },
+      company_number: {
+        type: GraphQLString,
+        description: 'The company registration / incorporation number of the company.'
+      },
+      status: {
+        type: GraphQLString,
+        description: 'Status of the company. (active, dissolved, liquidation, receivership, administration, voluntary-arrangement, converted-closed, insolvency-proceedings).'
+      },
+      facternNodeId: {
+        type: GraphQLString,
+        description: 'The Factern NodeID where this company information resides.',
+        resolve(parent, args, context, info) {
+          return context.facternService.getOrCreateNamedEntity(context.facternService.namedEntityPrefix + parent.company_number);
+        }
+      },
+      commentThread: {
+        type: this.commentThreadType,
+        resolve(parent, args, context, info) {
+          return context.facternService.readCommentThread(context.facternService.namedEntityPrefix + parent.company_number, context.loginId, context.authorization);
+        }
+      }
+    })
+  });
+
   private readonly companyType = new GraphQLObjectType({
     name: 'Company',
     description: 'Basic company information retrieved from Companies House',
@@ -104,7 +145,7 @@ export class CompanyTypedef {
       commentThread: {
         type: this.commentThreadType,
         resolve(parent, args, context, info) {
-          return context.facternService.readCommentThread(context.facternService.namedEntityPrefix + parent.company_number);
+          return context.facternService.readCommentThread(context.facternService.namedEntityPrefix + parent.company_number, context.loginId, context.authorization);
         }
       }
     })
@@ -154,10 +195,13 @@ export class CompanyTypedef {
         type: GraphQLString,
         description: 'The text of the comment in the information node.'
       },
+      owner: {
+        type: GraphQLString
+      },
       responseThread: {
         type: this.commentThreadType,
         resolve(parent, args, context, info) {
-          return context.facternService.readResponseThread(parent.id);
+          return context.facternService.readResponseThread(parent.id, context.loginId, context.authorization);
         }
       }
     })
@@ -203,7 +247,22 @@ export class CompanyTypedef {
         resolve(parent, args, context, info) {
           return context.facternService.templateRead(context.containerNode, context.templateNode, context.interfaceNode, args.query, args.items || 20, args.start || 0);
         }
+      },
+
+      companyDetails: {
+        type: this.companyProfileType,
+        description: 'Details about a company by company number.',
+        args: {
+          company_number: {
+            description: 'The company number to retrieve details for.',
+            type: new GraphQLNonNull(GraphQLString)
+          }
+        },
+        resolve(parent, args, context, info) {
+          return context.facternService.companyDetails(context.containerNode, context.companyProfileTemplateNode, context.companyDetailsInterfaceNode, args.company_number);
+        }
       }
+
     }
   });
 
@@ -211,6 +270,43 @@ export class CompanyTypedef {
     name: 'RootMutationType',
     description: 'This is the default root mutation provided by our application',
     fields: {
+
+      companies: {
+        type: this.companyResults,
+        description: 'List of companies that match the search criteria.',
+        args: {
+          query: {
+            description: 'The term being searched for.',
+            type: new GraphQLNonNull(GraphQLString)
+          },
+          items: {
+            description: 'The number of search results to return per page.',
+            type: GraphQLInt,
+          },
+          start: {
+            description: 'The index of the first result item to return.',
+            type: GraphQLInt
+          }
+        },
+        resolve(parent, args, context, info) {
+          return context.facternService.templateRead(context.containerNode, context.templateNode, context.interfaceNode, args.query, args.items || 20, args.start || 0);
+        }
+      },
+
+      companyDetails: {
+        type: this.companyProfileType,
+        description: 'Details about a company by company number.',
+        args: {
+          company_number: {
+            description: 'The company number to retrieve details for.',
+            type: new GraphQLNonNull(GraphQLString)
+          }
+        },
+        resolve(parent, args, context, info) {
+          return context.facternService.companyDetails(context.containerNode, context.companyProfileTemplateNode, context.companyDetailsInterfaceNode, args.company_number);
+        }
+      },
+
       addComment: {
         type: GraphQLString,
         description: 'Add a comment to a company record.',
@@ -222,12 +318,17 @@ export class CompanyTypedef {
           comment: {
             description: 'The comment to add.',
             type: new GraphQLNonNull(GraphQLString)
+          },
+          isPrivate: {
+            description: 'True if the comment is private',
+            type: new GraphQLNonNull(GraphQLBoolean)
           }
         },
         resolve(parent, args, context, info) {
-          return context.facternService.addCommentToCompany(args.number, args.comment);
+          return context.facternService.addCommentToCompany(args.number, args.comment, args.isPrivate, context.loginId, context.authorization);
         }
       },
+
       respondToComment: {
         type: GraphQLString,
         description: 'Add a response to a comment.',
@@ -239,12 +340,17 @@ export class CompanyTypedef {
           comment: {
             description: 'The comment to add.',
             type: new GraphQLNonNull(GraphQLString)
+          },
+          isPrivate: {
+            description: 'True if the comment is private',
+            type: new GraphQLNonNull(GraphQLBoolean)
           }
         },
         resolve(parent, args, context, info) {
-          return context.facternService.addResponseToComment(args.commentId, args.comment);
+          return context.facternService.addResponseToComment(args.commentId, args.comment, args.isPrivate, context.loginId, context.authorization);
         }
       }
+
     }
   });
 }

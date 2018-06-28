@@ -1,5 +1,13 @@
+/*
+ * factern.service.ts
+ *
+ * Copyright (C) 2018 Finovertech
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
 
-const FacternClient = require('factern_api_version_2/dist/factern-client-bundle');
+const FacternClient = require('@factern/factern-client');
 
 import { OAuthService } from '../service/oauth.service';
 
@@ -8,8 +16,14 @@ export interface CommentThreadResponse {
     comments: CommentThreadResponse[];
 }
 
-export class FacternService {
+export interface DescribeResponseNode {
+    nodeId: string;
+    agent: {
+        login: string;
+    }
+}
 
+export class FacternService {
     private loginId: string;
     private companyHouseKey: string;
 
@@ -18,14 +32,17 @@ export class FacternService {
     private readonly ApiClient = FacternClient.ApiClient.instance;
     private readonly FactsApi = new FacternClient.FactsApi();
     private readonly OAuth2 = this.ApiClient.authentications['OAuth2'];
+    private readonly appAuth: string;
 
-    private readonly NAMED_ENTITY_SERVICE = 'erchl-service-201806051014';
-    private readonly NAMED_ENTITY_PREFIX_COMPANY = 'erchl-company-201806051014-';
-    private readonly NAMED_FIELDTYPE_COMMENT = 'erchl-company-comment-field-201806051014';
-    private readonly NAMED_TEMPLATE_COMMENT = 'erchl-company-comment-template-201806051014';
-    private readonly NAMED_INTERFACE_COMPANIES = 'erchl-interface-companies-201806051014';
+    private readonly NAMED_ENTITY_SERVICE = 'erchl-service-201805111201';
+    private readonly NAMED_ENTITY_PREFIX_COMPANY = 'erchl-company-201806150954-';
+    private readonly NAMED_FIELDTYPE_COMMENT = 'erchl-company-comment-field-201805151540';
+    private readonly NAMED_TEMPLATE_COMMENT = 'erchl-company-comment-template-201805151540';
+    private readonly NAMED_INTERFACE_COMPANIES = 'erchl-interface-companies-201806201428';
+    private readonly NAMED_INTERFACE_COMPANY_DETAILS = 'erchl-interface-company-details-201806201428';
 
     public constructor(loginId: string, accessToken: string, companyHouseKey: string) {
+      this.appAuth = accessToken;
       this.OAuth2.accessToken = accessToken;
       this.loginId = loginId;
       this.companyHouseKey = companyHouseKey;
@@ -54,7 +71,7 @@ export class FacternService {
             });
             return templateResponse.data.nodeId;
         } catch (err) {
-            console.log(err);
+            console.error(err);
             return;
         }
     }
@@ -77,7 +94,53 @@ export class FacternService {
             });
             return templateReadResponse.data.items[0].readItem.data;
         } catch (err) {
-            console.log(err);
+            console.error(err);
+            return;
+        }
+    }
+
+    public async companyDetails(nodeId: string, templateId: string, defaultStorageId: string, company_number: string) {
+        try {
+            const templateReadResponse = await this.FactsApi.read({
+                login: this.loginId,
+                representing: this.loginId,
+                body: {
+                    nodeId: nodeId,
+                    templateId: templateId,
+                    defaultStorageId: defaultStorageId,
+                    parameters: [
+                        { key: 'company_number', value: company_number, persistent: false }
+                    ]
+                }
+            });
+            return templateReadResponse.data.items[0].readItem.data;
+        } catch (err) {
+            console.error(err);
+            return;
+        }
+    }
+
+    public async setPrivateNode(nodeId: string, loginId: string, authorization: string) {
+        try {
+            this.OAuth2.accessToken = authorization;
+
+            const policy = new FacternClient.PermissionPolicyDocument(
+                FacternClient.PermissionEffect.Deny,
+                []
+            );
+            policy.actions = [ FacternClient.PermissionAction.Read ];
+            const policyRequest = new FacternClient.CreatePermissionRequest(policy, nodeId);
+
+            const permissionResponse = await this.FactsApi.permission({
+                login: loginId,
+                representing: loginId,
+                body: policyRequest
+            });
+            this.OAuth2.accessToken = this.appAuth;
+            return permissionResponse;
+        } catch (err) {
+            console.error(err);
+            this.OAuth2.accessToken = this.appAuth;
             return;
         }
     }
@@ -106,7 +169,7 @@ export class FacternService {
             });
             return createFieldResponse.data.nodeId;
         } catch (err) {
-            console.log(err);
+            console.error(err);
             return;
         }
     }
@@ -147,26 +210,43 @@ export class FacternService {
             });
             return createInterfaceResponse.data.nodeId;
         } catch(err) {
-            console.log(err);
+            console.error(err);
+            return;
+        }
+    }
+
+    public async getOrCreateCompanyInterface(name: string) {
+        return (await this.describeByName('interface', name))
+            || (await this.createCompanyInterface(name));
+    }
+
+    public async createCompanyInterface(name: string) {
+        try {
+            const createInterfaceResponse = await this.FactsApi.createInterface({
+                login: this.loginId,
+                representing: this.loginId,
+                body: {
+                    name: name,
+                    addData: { url: 'https://api.companieshouse.gov.uk/search/companies', method: 'GET', async: false },
+                    getData: {
+                        url: 'https://api.companieshouse.gov.uk/company/{{company_number}}',
+                        method: 'GET',
+                        headers: [{ key: 'Authorization', value: 'Basic ' + this.companyHouseKey }],
+                        async: false
+                    },
+                    deleteData: { url: 'https://api.companieshouse.gov.uk/search/companies', method: 'GET', async: false }
+                }
+            });
+            return createInterfaceResponse.data.nodeId;
+        } catch(err) {
+            console.error(err);
             return;
         }
     }
 
     public async getOrCreateNamedEntity(name: string) {
-        let response;
-        try {
-            const describeResponse = await this.FactsApi.describe({
-                login: this.loginId,
-                representing: this.loginId,
-                body: new FacternClient.DescribeRequest(this.FRN_ENTITY_PREFIX + name)
-            });
-            response = describeResponse.data.node.nodeId;
-        } catch(err) {
-            const createResponse = await this.createNamedEntity(name);
-            response = createResponse.data.nodeId;
-        }
-
-        return response;
+        return (await this.describeByName('entity', name))
+            || (await this.createNamedEntity(this.FRN_ENTITY_PREFIX + name));
     }
 
     public async describeByName(type: string, name: string) {
@@ -178,6 +258,7 @@ export class FacternService {
             });
             return describeResponse.data.node.nodeId;
         } catch (err) {
+            console.error(err);
             return;
         }
     }
@@ -193,55 +274,117 @@ export class FacternService {
         });
     }
 
-    public async writeInformation(entityId: string, templateId: string, data: string) {
-        return await this.FactsApi.write({
-            login: this.loginId,
-            representing: this.loginId,
-            body: {
-                nodeId: entityId,
-                templateId: templateId,
-                values: [ data ]
-            }
-        });
+    public async writeInformation(entityId: string, templateId: string, data: string, loginId: string, authorization: string) {
+        this.OAuth2.accessToken = authorization;
+        try {
+            const writeNodeResponse = await this.FactsApi.write({
+                login: loginId,
+                representing: loginId,
+                body: {
+                    nodeId: entityId,
+                    templateId: templateId,
+                    values: [ data ]
+                }
+            });
+            this.OAuth2.accessToken = this.appAuth;
+            return writeNodeResponse;
+        } catch (err) {
+            console.error(err);
+            this.OAuth2.accessToken = this.appAuth;
+            return;
+        }
     }
 
-    public async read(nodeId: string, templateId: string) {
-        return await this.FactsApi.read({
-            login: this.loginId,
-            representing: this.loginId,
-            body: {
-                nodeId: nodeId,
-                templateId: templateId
-            }
-        });
+    public async read(nodeId: string, templateId: string, loginId: string, authorization: string) {
+        this.OAuth2.accessToken = authorization;
+        try {
+            const readResponse = await this.FactsApi.read({
+                login: loginId,
+                representing: loginId,
+                body: {
+                    nodeId: nodeId,
+                    templateId: templateId
+                }
+            });
+
+            this.OAuth2.accessToken = this.appAuth;
+            return readResponse;
+        } catch (err) {
+            console.error(err);
+            this.OAuth2.accessToken = this.appAuth;
+            return;
+        }
     }
 
-    public async addCommentToCompany(company_number: string, comment: string) {
+    public async addCommentToCompany(company_number: string, comment: string, isPrivate: boolean, loginId: string, authorization: string) {
         const companyEntity = await this.getOrCreateNamedEntity(this.NAMED_ENTITY_PREFIX_COMPANY + company_number);
         const commentField = await this.getOrCreateField(this.NAMED_FIELDTYPE_COMMENT, false, undefined);
         const templateId = await this.getOrCreateTemplate(this.NAMED_TEMPLATE_COMMENT, commentField);
-        const response = await this.writeInformation(companyEntity, templateId, comment);
-        return response.data.nodes[0].nodeId;
+        const response = await this.writeInformation(companyEntity, templateId, comment, isPrivate ? loginId : this.loginId, isPrivate ? authorization : this.appAuth);
+        const commentNode = response.data.nodes[0].nodeId;
+
+        if (isPrivate) {
+            await this.setPrivateNode(commentNode, loginId, authorization);
+        }
+
+        return commentNode;
     }
 
-    public async addResponseToComment(commentId: string, comment: string) {
+    public async addResponseToComment(commentId: string, comment: string, isPrivate: boolean, loginId: string, authorization: string) {
         const commentField = await this.getOrCreateField(this.NAMED_FIELDTYPE_COMMENT, false, undefined);
         const templateId = await this.getOrCreateTemplate(this.NAMED_TEMPLATE_COMMENT, commentField);
-        const response = await this.writeInformation(commentId, templateId, comment);
-        return response.data.nodes[0].nodeId;
+        const response = await this.writeInformation(commentId, templateId, comment, isPrivate ? loginId : this.loginId, isPrivate ? authorization : this.appAuth);
+        const commentNode = response.data.nodes[0].nodeId;
+
+        if (isPrivate) {
+            await this.setPrivateNode(commentNode, loginId, authorization);
+        }
+
+        return commentNode;
     }
 
-    public async readCommentThread(company_number: string): Promise<CommentThreadResponse> {
+    public async describeWithChildren(companyEntity: string) {
+        try {
+            const describeResponse = await this.FactsApi.describe({
+                login: this.loginId,
+                representing: this.loginId,
+                body: {
+                    nodeId: companyEntity,
+                    listChildren: {}
+                }
+            });
+
+            return describeResponse;
+        } catch (err) {
+            console.error(err);
+            return;
+        }
+    }
+
+    public ownerMap(nodes: DescribeResponseNode[]): Map<string, string> {
+        let map = new Map<string, string>();
+        for (let i = 0; i < nodes.length; ++i) {
+            map.set(nodes[i].nodeId, nodes[i].agent.login);
+        }
+        return map;
+    }
+
+    public async readCommentThread(company_number: string, loginId: string, authorization: string): Promise<CommentThreadResponse> {
         const companyEntity = await this.getOrCreateNamedEntity(company_number);
         const commentField = await this.getOrCreateField(this.NAMED_FIELDTYPE_COMMENT, false, undefined);
         const templateId = await this.getOrCreateTemplate(this.NAMED_TEMPLATE_COMMENT, commentField);
-        const response = await this.read(companyEntity, templateId);
+
+        const describeResponse = await this.describeWithChildren(companyEntity);
+        const ownerMap = this.ownerMap(describeResponse.data.children.nodes);
+
+        const response = await this.read(companyEntity, templateId, loginId.length > 0 ? loginId : this.loginId, loginId.length > 0 ? authorization : this.appAuth);
         const readItem = response.data.items[0].readItem.nodes;
         let comments: any[] = [];
         for (let i = 0; i < readItem.length; ++i) {
             comments.push({
                 id: readItem[i].nodeId,
-                text: readItem[i].data
+                text: readItem[i].data,
+                owner: ownerMap.get(readItem[i].nodeId)
             });
         }
         return {
@@ -250,16 +393,17 @@ export class FacternService {
         };
     }
 
-    public async readResponseThread(commentId: string): Promise<CommentThreadResponse> {
+    public async readResponseThread(commentId: string, loginId: string, authorization: string): Promise<CommentThreadResponse> {
         const commentField = await this.getOrCreateField(this.NAMED_FIELDTYPE_COMMENT, false, undefined);
         const templateId = await this.getOrCreateTemplate(this.NAMED_TEMPLATE_COMMENT, commentField);
-        const response = await this.read(commentId, templateId);
+        const response = await this.read(commentId, templateId, loginId.length > 0 ? loginId : this.loginId, loginId.length > 0 ? authorization : this.appAuth);
+
         const readItem = response.data.items[0].readItem.nodes;
         let comments: any[] = [];
         for (let i = 0; i < readItem.length; ++i) {
             comments.push({
                 id: readItem[i].nodeId,
-                text: readItem[i].data
+                text: readItem[i].data,
             });
         }
         return {

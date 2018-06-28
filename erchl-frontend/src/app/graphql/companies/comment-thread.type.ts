@@ -1,5 +1,5 @@
 /*
- * index.ts
+ * comment-thread.type.ts
  *
  * Copyright (C) 2018 Finovertech
  *
@@ -7,4 +7,9 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-export { CompanyTypedef } from './company.typedef';
+import { Comment } from './comment.type';
+
+export interface CommentThread {
+  count: number;
+  comments: Comment[];
+}

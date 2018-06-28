@@ -1,0 +1,61 @@
+<!--
+/*
+ * main.component.html
+ *
+ * Copyright (C) 2018 Finovertech
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
+-->
+  <main role="main" style="margin-top: 80px;">
+
+    <!-- Contact form -->
+    <div class="contact-form">
+      <div class="container">
+
+        <form [formGroup]="searchFormGroup">
+
+          <div class="row justify-content-md-center">
+           <div class="col-lg-8 col-md-8 col-sm-12">
+              <div class="form-group">
+                <input formControlName="name" type="text" class="form-control form-control-lg" placeholder="Company Name" name="" aria-label="Company Name">
+              </div>
+              <button type="button" class="btn btn-secondary btn-block" (click)="search()">Search</button>
+            </div>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <div *ngIf="searching" class="container">
+      <div class="row justify-content-md-center">
+        <div class="col-lg-8 col-md-8 col-sm-12">
+          <div class="loader"></div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="companyListAsync | async as companyList" class="container">
+      <div class="row">
+        <div class="col-sm-2"><h3>#</h3></div>
+        <div class="col-sm-3"><h3>Title</h3></div>
+        <div class="col-sm-2"><h3>Status</h3></div>
+        <div class="col-sm-3"><h3>Comments</h3></div>
+      </div>
+      <div *ngFor="let company of companyList.items; let odd = odd" class="row" [class.odd]="odd">
+        <div class="col-sm-2"><a [routerLink]="['/details', company.company_number ]">{{ company.company_number }}</a></div>
+        <div class="col-sm-3">{{ company.title }}</div>
+        <div class="col-sm-2">{{ company.company_status }}</div>
+        <div class="col-sm-3">{{ company.commentThread.count }}</div>
+        <div *ngIf="company.commentThread.count > 0" class="container comments">
+          <div *ngFor="let comment of company.commentThread.comments" class="row">
+            <div class="col-sm-12">>> {{ comment.text }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
