@@ -20,6 +20,12 @@ import { Schema } from './graphql/schema';
 import { CompanyTypedef } from './graphql/typedefs/company.typedef';
 
 export async function main() {
+  ['FACTERN_LOGIN_ID', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET', 'COMPANY_HOUSE_KEY'].forEach(key => {
+    if(!(key in process.env)) {
+      console.log(`Missing required environment variable: ${key}`);
+      process.exit(0)
+    }
+  });
 
   const loginId: string = '' + process.env.FACTERN_LOGIN_ID;
   const oauthClientId: string = '' + process.env.OAUTH_CLIENT_ID;
