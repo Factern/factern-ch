@@ -23,9 +23,24 @@ export interface DescribeResponseNode {
     }
 }
 
+class DescribeCacheEntry {
+    public readonly type: string;
+    public readonly name: string;
+    public readonly describeResponse: any;
+    constructor(type: string, name: string, describeResponse: any) {
+        this.type = type;
+        this.name = name;
+        this.describeResponse = describeResponse;
+    }
+    public matches(type: string, name: string): boolean {
+        return this.type == type && this.name == name;
+    }
+}
+
 export class FacternService {
     private loginId: string;
     private companyHouseKey: string;
+    private readonly describeCache: Array<DescribeCacheEntry> = [];
 
     private readonly FRN_DATAROOT = 'frn:entity::factern-dataRoot';
     private readonly FRN_ENTITY_PREFIX = 'frn:entity::';
@@ -42,10 +57,10 @@ export class FacternService {
     private readonly NAMED_INTERFACE_COMPANY_DETAILS = 'erchl-interface-company-details-201806201428';
 
     public constructor(loginId: string, accessToken: string, companyHouseKey: string) {
-      this.appAuth = accessToken;
-      this.OAuth2.accessToken = accessToken;
-      this.loginId = loginId;
-      this.companyHouseKey = companyHouseKey;
+        this.appAuth = accessToken;
+        this.OAuth2.accessToken = accessToken;
+        this.loginId = loginId;
+        this.companyHouseKey = companyHouseKey;
     }
 
     get namedEntityPrefix() {
@@ -150,7 +165,8 @@ export class FacternService {
     }
 
     public async getOrCreateField(name: string, isUniqueByParent: boolean, storageId: string | undefined) {
-        return await this.describeByName('field', name) || (await this.createField(name, isUniqueByParent, storageId));
+        return (await this.describeByName('field', name))
+            || (await this.createField(name, isUniqueByParent, storageId));
     }
 
     public async createField(name: string, isUniqueByParent: boolean, storageId: string | undefined) {
@@ -249,13 +265,36 @@ export class FacternService {
             || (await this.createNamedEntity(this.FRN_ENTITY_PREFIX + name));
     }
 
+    public precache(resources: [string, string][]): Promise<any> {
+        return Promise.all(resources.map(([type, name]) => this.describeByName(type, name)));
+    }
+
+    public async standardPrecache() {
+        return this.precache([
+            ["entity", this.NAMED_ENTITY_SERVICE],
+            ["field", this.NAMED_FIELDTYPE_COMMENT],
+            ["template", this.NAMED_TEMPLATE_COMMENT],
+            ["interface", this.NAMED_INTERFACE_COMPANIES]
+        ]);
+    }
+
     public async describeByName(type: string, name: string) {
+        // Everything that calls this can have its responses cached
+        for(let entry of this.describeCache) {
+            if(entry.matches(type, name)) {
+                return entry.describeResponse.data.node.nodeId;
+            }
+        }
         try {
             const describeResponse = await this.FactsApi.describe({
                 login: this.loginId,
                 representing: this.loginId,
                 body: new FacternClient.DescribeRequest('frn:' + type + '::' + name)
             });
+            // Theoretically, we could get two identical describeByName calls simultaneously, and
+            // then they would both come back later and both get added to the cache. This doesn't
+            // break anything, though, and so there's no need to check for uniqueness.
+            this.describeCache.push(new DescribeCacheEntry(type, name, describeResponse));
             return describeResponse.data.node.nodeId;
         } catch (err) {
             console.error(err);
