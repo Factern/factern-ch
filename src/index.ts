@@ -20,6 +20,12 @@ import { Schema } from './graphql/schema';
 import { CompanyTypedef } from './graphql/typedefs/company.typedef';
 
 export async function main() {
+  ['FACTERN_LOGIN_ID', 'OAUTH_CLIENT_ID', 'OAUTH_CLIENT_SECRET', 'COMPANY_HOUSE_KEY'].forEach(key => {
+    if(!(key in process.env)) {
+      console.log(`Missing required environment variable: ${key}`);
+      process.exit(0)
+    }
+  });
 
   const loginId: string = '' + process.env.FACTERN_LOGIN_ID;
   const oauthClientId: string = '' + process.env.OAUTH_CLIENT_ID;
@@ -28,6 +34,16 @@ export async function main() {
 
   const auth: OAuthService = new OAuthService(oauthClientId, oauthClientSecret);
   const facternService: FacternService = new FacternService(loginId, await auth.accessToken(), companyHouseKey);
+  await facternService.precache([
+    ['field', 'erchl-extfield-201805141453'],
+    ['field', 'erchl-company-comment-201805141453'],
+    ['template', 'erchl-template-201805111201'],
+    ['template', 'erchl-company-comment-template-201805111201'],
+    ['interface', 'erchl-company-details-interface-201805311560'],
+    ['field', 'erchl-companyprofile-201805311559'],
+    ['template', 'erchl-company-profile-template-201805311559']
+  ]);
+  await facternService.standardPrecache();
   const containerNode = await facternService.getServiceContainerNode();
   const interfaceNode = await facternService.getOrCreateInterface();
   const extFieldTypeNode = await facternService.getOrCreateField('erchl-extfield-201805141453', true, interfaceNode);
@@ -83,7 +99,7 @@ export async function main() {
     const server = app.listen(3000, () => {
       console.log('Go to http://localhost:3000/graphiql to run queries!');
       resolve(server);
-    }).on("error", (err: Error) => {
+    }).on('error', (err: Error) => {
       reject(err);
     });
   });
