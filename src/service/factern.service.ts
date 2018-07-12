@@ -271,10 +271,10 @@ export class FacternService {
 
     public async standardPrecache() {
         return this.precache([
-            ["entity", this.NAMED_ENTITY_SERVICE],
-            ["field", this.NAMED_FIELDTYPE_COMMENT],
-            ["template", this.NAMED_TEMPLATE_COMMENT],
-            ["interface", this.NAMED_INTERFACE_COMPANIES]
+            ['entity', this.NAMED_ENTITY_SERVICE],
+            ['field', this.NAMED_FIELDTYPE_COMMENT],
+            ['template', this.NAMED_TEMPLATE_COMMENT],
+            ['interface', this.NAMED_INTERFACE_COMPANIES]
         ]);
     }
 
